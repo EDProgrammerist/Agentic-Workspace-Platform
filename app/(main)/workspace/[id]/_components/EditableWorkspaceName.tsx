@@ -13,7 +13,7 @@ export function EditableWorkspaceName({
 }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(initialName);
-  const { fn: updateWorkspaceFn } = useFetch(updateWorkspace);
+  const { fn: updateWorkspaceFn, loading } = useFetch(updateWorkspace);
 
   const commit = async () => {
     setEditing(false);
@@ -23,7 +23,8 @@ export function EditableWorkspaceName({
       setName(initialName);
       return;
     }
-    await updateWorkspaceFn(workspaceId, trimmed);
+    const updated = await updateWorkspaceFn(workspaceId, trimmed);
+    setName(updated?.name ?? initialName);
   };
 
   if (editing) {
@@ -33,7 +34,7 @@ export function EditableWorkspaceName({
         onChange={(e) => setName(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => {
-          if (e.key === "Enter") commit();
+          if (e.key === "Enter" && !e.nativeEvent.isComposing) commit();
           if (e.key === "Escape") {
             setName(initialName);
             setEditing(false);
@@ -47,6 +48,7 @@ export function EditableWorkspaceName({
 
   return (
     <button
+      disabled={loading}
       onClick={() => setEditing(true)}
       className="rounded-md px-1.5 py-0.5 text-sm font-medium transition-colors hover:bg-accent"
     >

@@ -1,6 +1,9 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useMemo } from "react";
+import { toast } from "sonner";
+import { createAutosave } from "@/lib/autosave";
+import { listenToCanvasChanges } from "@/lib/canvas-changes";
 import { useUser } from "@clerk/nextjs";
 import {
   Tldraw,
@@ -28,8 +31,6 @@ import { AddEntityTableButton } from "@/components/EntityTable/AddEntityTableBut
 import { snapArrowBindingToRow } from "@/components/EntityTable/snapArrowToRow";
 import { useWorkspaceEditors } from "@/components/WorkspaceEditorsContext";
 import { colorForUser } from "@/lib/utils";
-
-const SAVE_DEBOUNCE_MS = 1000;
 
 const shapeUtils = [EntityTableShapeUtil];
 
@@ -76,7 +77,6 @@ export function CanvasEditor({
   workspaceId: string;
   initialSnapshot: TLEditorSnapshot | null;
 }) {
-  const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { setCanvasEditor } = useWorkspaceEditors();
   const { user } = useUser();
 
@@ -125,24 +125,18 @@ export function CanvasEditor({
       editor.loadSnapshot(initialSnapshot);
     }
 
-    editor.store.listen(
-      () => {
-        if (saveTimeout.current) clearTimeout(saveTimeout.current);
-        saveTimeout.current = setTimeout(() => {
-          // getSnapshot() carries non-plain internals (schema is a class instance, not JSON) that
-          // occasionally fail to cross the Server Action boundary as "opaque temporary reference"
-          // errors — round-tripping through JSON strips those and leaves genuinely plain data.
-          const plainSnapshot = JSON.parse(
-            JSON.stringify(editor.getSnapshot())
-          ) as Prisma.InputJsonValue;
-          saveCanvasContent(workspaceId, plainSnapshot);
-        }, SAVE_DEBOUNCE_MS);
-      },
-      { source: "user", scope: "document" }
+    const autosave = createAutosave(
+      // Strip schema class instances before crossing the Server Action boundary.
+      () => JSON.parse(JSON.stringify(editor.getSnapshot())) as Prisma.InputJsonValue,
+      (snapshot) => saveCanvasContent(workspaceId, snapshot),
+      () => toast.error("Couldn't save the canvas. Check your connection and try editing again."),
+      1000,
+      `canvas:${workspaceId}`,
     );
+    const stopSaving = listenToCanvasChanges(editor.store, () => autosave.schedule());
 
     // Arrows drawn onto an ERD table snap to the nearest row (see snapArrowToRow.ts).
-    editor.store.listen(
+    const stopSnapping = editor.store.listen(
       (entry) => {
         for (const record of Object.values(entry.changes.added)) {
           if (record.typeName === "binding" && record.type === "arrow") {
@@ -154,7 +148,12 @@ export function CanvasEditor({
     );
 
     // Clear it on unmount (e.g. switching to the Document view) so nothing keeps a disposed editor.
-    return () => setCanvasEditor(null);
+    return () => {
+      stopSaving();
+      stopSnapping();
+      void autosave.dispose();
+      setCanvasEditor(null);
+    };
   };
 
   return (

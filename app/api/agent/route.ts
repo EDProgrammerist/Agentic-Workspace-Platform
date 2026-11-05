@@ -1,5 +1,6 @@
 import { google } from "@ai-sdk/google";
-import { streamText, convertToModelMessages, type UIMessage } from "ai";
+import { streamText, convertToModelMessages } from "ai";
+import { parseAgentRequest } from "@/lib/agent-request";
 import { agentToolDefs } from "@/lib/agent-tools";
 import { PROMPT_LIMIT_ERROR } from "@/lib/plan-limits";
 import { checkUser } from "@/actions/check-user";
@@ -39,17 +40,10 @@ export async function POST(req: Request) {
   const user = await checkUser();
   if (!user) return new Response("Unauthorized", { status: 401 });
 
-  const {
-    messages,
-    workspaceId,
-    canvasContext,
-    docContext,
-  }: {
-    messages: UIMessage[];
-    workspaceId: string;
-    canvasContext: string | null;
-    docContext: string | null;
-  } = await req.json();
+  const body = await req.json().catch(() => null);
+  const request = await parseAgentRequest(body);
+  if (!request) return Response.json({ error: "Invalid agent request" }, { status: 400 });
+  const { messages, workspaceId, canvasContext, docContext } = request;
 
   if (!(await canAccessWorkspace(workspaceId))) return new Response("Workspace not found", { status: 404 });
 

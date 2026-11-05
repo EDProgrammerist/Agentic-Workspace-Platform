@@ -62,6 +62,7 @@ function WorkspaceForm({ workspace, onDone }: { workspace?: EditableWorkspace; o
   const openUpgrade = useUpgradeDialog();
 
   const handleSubmit = async () => {
+    if (loading || !name.trim()) return;
     if (workspace) {
       const updated = await updateWorkspaceFn(workspace.id, name, description);
       if (updated) onDone();
@@ -83,7 +84,12 @@ function WorkspaceForm({ workspace, onDone }: { workspace?: EditableWorkspace; o
           placeholder="Q1 Marketing Launch"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              void handleSubmit();
+            }
+          }}
           autoFocus
         />
       </div>

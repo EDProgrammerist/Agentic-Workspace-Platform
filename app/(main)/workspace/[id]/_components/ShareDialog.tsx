@@ -76,8 +76,12 @@ export function ShareDialog({
   };
 
   const copyLink = async () => {
-    await navigator.clipboard.writeText(shareUrl);
-    toast.success("Link copied");
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast.success("Link copied");
+    } catch {
+      toast.error("Couldn't copy the link. Select and copy it from the field instead.");
+    }
   };
 
   // BlockNote's own exporter builds a real text PDF from the live doc. Both libraries are

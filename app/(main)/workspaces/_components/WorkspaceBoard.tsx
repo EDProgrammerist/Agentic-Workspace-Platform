@@ -55,7 +55,10 @@ export function WorkspaceBoard({ workspaces }: { workspaces: BoardWorkspace[] })
   // `selected` outlives the open flag, so dialog text doesn't blank out during the close animation.
   const [selected, setSelected] = useState<BoardWorkspace | null>(null);
   const [openDialog, setOpenDialog] = useState<"edit" | "delete" | null>(null);
-  const { fn: deleteWorkspaceFn, loading: isDeleting } = useFetch(deleteWorkspace);
+  const { fn: deleteWorkspaceFn, loading: isDeleting } = useFetch(async (id: string) => {
+    await deleteWorkspace(id);
+    return true;
+  });
 
   const openFor = (workspace: BoardWorkspace, dialog: "edit" | "delete") => {
     setSelected(workspace);
@@ -66,8 +69,7 @@ export function WorkspaceBoard({ workspaces }: { workspaces: BoardWorkspace[] })
     // Keep the dialog open until the delete finishes (AlertDialogAction closes it by default).
     e.preventDefault();
     if (!selected) return;
-    await deleteWorkspaceFn(selected.id);
-    setOpenDialog(null);
+    if (await deleteWorkspaceFn(selected.id)) setOpenDialog(null);
   };
 
   const handleDragEnd = async ({ draggableId, source, destination }: DropResult) => {

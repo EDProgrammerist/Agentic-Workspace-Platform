@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
+import { toast } from "sonner";
+import { createAutosave } from "@/lib/autosave";
 import { useUser } from "@clerk/nextjs";
 import * as Y from "yjs";
 import { useCreateBlockNote } from "@blocknote/react";
@@ -16,8 +18,6 @@ import type { SupabaseYjsProvider } from "@/lib/supabase-yjs-provider";
 import { toBase64 } from "@/lib/base64";
 import { colorForUser } from "@/lib/utils";
 import { outpostDarkTheme } from "@/lib/blocknote-theme";
-
-const SAVE_DEBOUNCE_MS = 1000;
 
 type DocEditorProps = {
   workspaceId: string;
@@ -79,26 +79,26 @@ function CollaborativeEditor({
   // Save only our own edits (remote ones are saved by whoever made them). The server merges
   // the state, and also keeps a readable JSON copy for server-side features.
   useEffect(() => {
-    let timeout: ReturnType<typeof setTimeout> | undefined;
-    const save = () => {
-      timeout = undefined;
-      const content = JSON.parse(JSON.stringify(editor.document)) as Prisma.InputJsonValue;
-      saveDocContent(workspaceId, toBase64(Y.encodeStateAsUpdate(doc)), content);
-    };
+    const autosave = createAutosave(
+      () => ({
+        content: JSON.parse(JSON.stringify(editor.document)) as Prisma.InputJsonValue,
+        state: toBase64(Y.encodeStateAsUpdate(doc)),
+      }),
+      ({ state, content }) => saveDocContent(workspaceId, state, content),
+      () => toast.error("Couldn't save the document. Check your connection and try editing again."),
+      1000,
+      `doc:${workspaceId}`,
+    );
     const handleUpdate = (_update: Uint8Array, origin: unknown) => {
       if (origin === provider) return;
-      clearTimeout(timeout);
-      timeout = setTimeout(save, SAVE_DEBOUNCE_MS);
+      autosave.schedule();
     };
 
     doc.on("update", handleUpdate);
     return () => {
       doc.off("update", handleUpdate);
       // Flush a pending save rather than dropping the last edits when leaving the page.
-      if (timeout) {
-        clearTimeout(timeout);
-        save();
-      }
+      void autosave.dispose();
     };
   }, [doc, editor, provider, workspaceId]);
 

@@ -15,11 +15,14 @@ export async function checkUser() {
 
   if (existing) return existing;
 
-  const email = clerkUser.emailAddresses[0]?.emailAddress;
+  const email = clerkUser.primaryEmailAddress?.emailAddress ?? clerkUser.emailAddresses[0]?.emailAddress;
   if (!email) return null;
 
-  return prisma.user.create({
-    data: {
+  // Two concurrent first requests can both miss the lookup above.
+  return prisma.user.upsert({
+    where: { clerkId: clerkUser.id },
+    update: { clerkId: clerkUser.id },
+    create: {
       clerkId: clerkUser.id,
       email,
       name: `${clerkUser.firstName ?? ""} ${clerkUser.lastName ?? ""}`.trim() || null,
