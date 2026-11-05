@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Show, SignInButton, SignUpButton, UserButton, OrganizationSwitcher, useAuth } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { PlanButton } from "@/components/PlanButton";
+import navbarLogo from "@/public/brand/logo-navbar-dark.png";
 
 // Shared across every route (root layout). The landing page gets its section links and a way into
 // the app; inside the app, the logo leads home to the dashboard and the plan button takes its place.
@@ -17,7 +18,7 @@ export function SiteHeader() {
   return (
     <header className="fixed inset-x-0 top-0 z-20 flex h-18 items-center justify-between border-b border-white/6 bg-background/70 px-6 backdrop-blur-md md:px-10">
       <Link href={isSignedIn && !isLandingPage ? "/dashboard" : "/"} className="flex items-center">
-        <Image src="/brand/logo-navbar-dark.png" alt="Outpost" width={314} height={160} className="h-9 w-auto" priority />
+        <Image src={navbarLogo} alt="Outpost" className="h-9 w-auto" priority />
       </Link>
       {isLandingPage && (
         <nav className="hidden items-center gap-8 text-sm text-muted-foreground md:flex">
